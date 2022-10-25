@@ -53,10 +53,8 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """
-    Делает запрос к API-сервису Яндекса
-    и возвращает приведенные к типам данных Python.
-    """
+    """Делает запрос к API-сервису Яндекса
+    и возвращает приведенные к типам данных Python."""
     try:
         timestamp = current_timestamp or int(time.time())
         params = {'from_date': timestamp}
