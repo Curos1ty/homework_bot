@@ -40,7 +40,12 @@ def send_message(bot, message):
     Отправка сообщения через бота в Telegram чат.
     """
     try:
-        logging.info(f'Информация отправлена пользователю с ID: {TELEGRAM_CHAT_ID}:\n{message}')
+        logging.info(
+            'Информация отправлена пользователю с ID: {}:\n{}'.format(
+                TELEGRAM_CHAT_ID,
+                message
+            )
+        )
         bot.send_message(
             TELEGRAM_CHAT_ID,
             message,
@@ -119,21 +124,22 @@ def parse_status(homework):
     homework_status = homework.get('status')
 
     if homework_status not in HOMEWORK_STATUSES:
-        raise Exception(f'{homework_status} - такой статус отсутствует в списке')
+        raise Exception(
+            f'{homework_status} - такой статус отсутствует в списке'
+        )
 
     verdict = HOMEWORK_STATUSES[homework_status]
     logging.info(f'{homework_name}, {verdict} {time.asctime()}')
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
-
 def check_tokens():
     """
     Проверка переменных окружения необходимых для работы.
     """
-    if PRACTICUM_TOKEN == None or TELEGRAM_TOKEN == None or TELEGRAM_CHAT_ID == None:
+    if not PRACTICUM_TOKEN or not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         return False
-    
+
     return True
 
 
@@ -154,7 +160,7 @@ def main():
 
                 if homeworks:
                     status_message = parse_status(homeworks[0])
-                    logging.info(f'Данные последней работы корректны')
+                    logging.info('Данные последней работы корректны')
                     send_message(bot, status_message)
                     current_timestamp = response['current_date']
                 else:
@@ -171,11 +177,12 @@ def main():
     else:
         error_message = (
             'Необходимые для работы переменные окружения отсутствуют, '
-            'проверьте пожалуйста: PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. '
+            'проверьте: PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. '
             'Работа программы будет остановлена'
         )
         logging.critical(error_message)
         sys.exit(error_message)
+
 
 if __name__ == '__main__':
     main()
