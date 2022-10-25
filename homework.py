@@ -36,9 +36,7 @@ logging.basicConfig(
 
 
 def send_message(bot, message):
-    """
-    Отправка сообщения через бота в Telegram чат.
-    """
+    """Отправка сообщения через бота в Telegram чат."""
     try:
         logging.info(
             'Информация отправлена пользователю с ID: {}:\n{}'.format(
@@ -85,9 +83,7 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """
-    Проверка ответа API на корректность.
-    """
+    """Проверка ответа API на корректность."""
     if not isinstance(response, dict):
         raise TypeError(
             'Некорректный ответ сервера'
@@ -95,7 +91,7 @@ def check_response(response):
 
     if 'homeworks' not in response:
         raise KeyError('В ответе API отсутствует ключ homeworks')
-    
+
     if 'current_date' not in response:
         raise KeyError('В ответе API отсутствует ключ current_date')
 
@@ -103,7 +99,7 @@ def check_response(response):
         raise TypeError(
             'В API по ключу current_date должно быть целым числом'
         )
-    
+
     if not isinstance(response['homeworks'], list):
         raise TypeError('Значение по ключу должно быть list')
 
@@ -111,9 +107,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """
-    Получение статуса работы заданной домашки.
-    """
+    """Получение статуса работы заданной домашки."""
     if 'homework_name' not in homework:
         raise KeyError('В ответе API не найден ключ homework_name')
 
@@ -134,9 +128,7 @@ def parse_status(homework):
 
 
 def check_tokens():
-    """
-    Проверка переменных окружения необходимых для работы.
-    """
+    """Проверка переменных окружения необходимых для работы."""
     if not PRACTICUM_TOKEN or not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         return False
 
@@ -144,9 +136,7 @@ def check_tokens():
 
 
 def main():
-    """
-    Основная логика работы бота.
-    """
+    """Основная логика работы бота."""
     if check_tokens():
         bot = Bot(token=TELEGRAM_TOKEN)
         current_timestamp = int(time.time())
@@ -165,7 +155,7 @@ def main():
                     current_timestamp = response['current_date']
                 else:
                     logging.debug('Ошибка получения данных последней домашки')
-                
+
                 time.sleep(RETRY_TIME)
 
             except Exception as error:
