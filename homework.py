@@ -3,6 +3,8 @@ import os
 import sys
 import time
 from http import HTTPStatus
+from logging.handlers import RotatingFileHandler
+from typing import Dict
 
 import requests
 from dotenv import load_dotenv
@@ -14,7 +16,7 @@ load_dotenv()
 
 PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN_ENV')
 TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN_ENV')
-TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID_ENV')
+TELEGRAM_CHAT_ID: int = None  # os.getenv('TELEGRAM_CHAT_ID_ENV')
 
 TOKEN_NAMES = [
     'PRACTICUM_TOKEN',
@@ -24,9 +26,9 @@ TOKEN_NAMES = [
 
 RETRY_TIME: int = 300
 ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
-HEADERS: dict = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
+HEADERS: Dict[str, str] = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
-HOMEWORK_VERDICTS: dict = {
+HOMEWORK_VERDICTS: Dict[str, str] = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
@@ -40,17 +42,16 @@ def send_message(bot, message):
             TELEGRAM_CHAT_ID,
             message,
         )
-    except Exception as error:
-        raise MyCustomError(
-            "Ошибка отправки сообщения функции send_message"
-            + f'Попытка через бота {bot} отправить сообщение пользователю с ID'
+    except Exception:
+        logging.error(
+            'Ошибка отправки сообщения функции send_message'
+            f'Попытка через бота {bot} отправить сообщение пользователю с ID'
             + str({TELEGRAM_CHAT_ID})
-            + f'\n Ошибка {error}'
         )
     else:
         logging.info(
             f'Пользователю с ID - {TELEGRAM_CHAT_ID}, '
-            + f'от бота отправлена следующая информация:\n{message}'
+            f'от бота отправлена следующая информация:\n{message}'
         )
 
 
@@ -67,42 +68,54 @@ def get_api_answer(current_timestamp):
         )
     except Exception as error:
         raise MyCustomError(
-            f'Запрос не удался: {error} '
-            + f'код ответа сервера: {response.status_code}'
+            f'Запрос не удался: {error}. '
+            f'Код ответа сервера: {response.status_code}'
+            f'Параметры: адрес api {ENDPOINT}, данные авторизации {HEADERS}'
+            f'метка даты в Unix {current_timestamp}'
         )
 
     if response.status_code != HTTPStatus.OK:
         raise MyCustomError(
-            'Ответ от сервера некорректный: '
-            + f'{response.status_code}, данные авторизации {HEADERS}'
-            + f'адрес api {ENDPOINT}'
+            'Ответ от сервера некорректный, код: '
+            f'{response.status_code}, данные авторизации {HEADERS}'
+            f'адрес api {ENDPOINT}, метка даты в Unix {current_timestamp}'
         )
-    elif isinstance(response.json(), dict):
-        return response.json()
+
+    return response.json()
 
 
 def check_response(response):
     """Проверка ответа API на корректность."""
     if not isinstance(response, dict):
         raise TypeError(
-            'Некорректный ответ сервера'
+            f'В ответе API ожидался словарь, получен {type(response)}'
         )
 
     if 'homeworks' not in response:
-        raise KeyError('В ответе API отсутствует ключ homeworks')
+        raise KeyError(
+            'В ответе API отсутствует ключ homeworks'
+        )
 
     if 'current_date' not in response:
-        raise KeyError('В ответе API отсутствует ключ current_date')
+        raise KeyError(
+            'В ответе API отсутствует ключ current_date'
+        )
 
     if not isinstance(response['current_date'], int):
         raise TypeError(
-            'В API по ключу current_date должно быть целым числом'
+            'В ответе API по ключу "current_date" должно быть целое число, '
+            f'сейчас там {type(response["current_date"])}'
         )
 
-    if not isinstance(response['homeworks'], list):
-        raise TypeError('Значение по ключу должно быть list')
+    homeworks = response['homeworks']
 
-    return response['homeworks']
+    if not isinstance(homeworks, list):
+        raise TypeError(
+            'В ответе API значение по ключу "homeworks" должно быть list'
+            f'сейчас там {type(response("homeworks"))}'
+        )
+    else:
+        return homeworks
 
 
 def parse_status(homework):
@@ -113,15 +126,14 @@ def parse_status(homework):
     if 'status' not in homework:
         raise KeyError('В ответе API не найден ключ status')
 
-    homework_name = homework.get('homework_name')
-    homework_status = homework.get('status')
+    homework_name = homework.get("homework_name")
 
-    if homework_status not in HOMEWORK_VERDICTS:
+    if homework.get('status') not in HOMEWORK_VERDICTS:
         raise Exception(
-            f'{homework_status} - такой статус отсутствует в списке'
+            f'{homework.get("status")} - такой статус отсутствует в списке'
         )
 
-    verdict = HOMEWORK_VERDICTS[homework_status]
+    verdict = HOMEWORK_VERDICTS[homework.get('status')]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -144,32 +156,39 @@ def main():
             'Работа программы будет остановлена'
         )
         logging.critical(error_message)
-        sys.exit(error_message)
+        raise SystemExit(error_message)
 
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp: int = 0
     status_message_old: str = ''
+    message_error_old: str = ''
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            logging.info(response)
+            logging.info(f'От API получена следующая информация: \n{response}')
             homeworks = check_response(response)
-            logging.info(homeworks)
+            logging.info(f'Ответ API корректный: \n{homeworks}')
 
-            if homeworks:
-                status_message = parse_status(homeworks[0])
-                logging.info('Данные последней работы корректны')
+            if not homeworks:
+                logging.error(
+                    'Ошибка получения данных последней домашки'
+                    'словарь "homeworks" пуст'
+                )
 
-                if status_message_old != status_message:
-                    send_message(bot, status_message)
-                    status_message_old = status_message
+            status_message = parse_status(homeworks[0])
+            logging.info(f'Статус последней работы получен:\n{status_message}')
 
-            else:
-                logging.error('Ошибка получения данных последней домашки')
+            if status_message_old != status_message:
+                send_message(bot, status_message)
+                status_message_old = status_message
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
+
+            if message_error_old != message:
+                send_message(bot, message)
+                message_error_old = message
+
         else:
             logging.info('Все запросы выполнены, ожидается повторный запуск')
         finally:
@@ -178,11 +197,23 @@ def main():
 
 if __name__ == '__main__':
     logging.basicConfig(
+        handlers=[
+            RotatingFileHandler(
+                filename=os.path.join(
+                    os.path.dirname(__file__),
+                    'homework.py.log'
+                ),
+                mode='w',
+                maxBytes=100000,
+                backupCount=5,
+                encoding='utf-8',
+            ),
+            logging.StreamHandler(sys.stdout),
+        ],
         format=(
             '%(asctime)s - %(levelname)s - '
-            + '%(funcName)s - %(lineno)s - %(message)s'
+            '%(funcName)s - %(lineno)d - %(message)s'
         ),
-        handlers=[logging.FileHandler('homework.py.log', 'w', 'utf-8')],
         level=logging.DEBUG,
     )
     main()
