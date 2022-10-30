@@ -10,7 +10,7 @@ import requests
 from dotenv import load_dotenv
 from telegram import Bot
 
-from exception import MyCustomError
+from exception import IncorrectResponseServerError
 
 load_dotenv()
 
@@ -67,7 +67,7 @@ def get_api_answer(current_timestamp):
             params={'from_date': current_timestamp}
         )
     except Exception as error:
-        raise MyCustomError(
+        raise IncorrectResponseServerError(
             f'Запрос не удался: {error}. '
             f'Код ответа сервера: {response.status_code}'
             f'Параметры: адрес api {ENDPOINT}, данные авторизации {HEADERS}'
@@ -75,7 +75,7 @@ def get_api_answer(current_timestamp):
         )
 
     if response.status_code != HTTPStatus.OK:
-        raise MyCustomError(
+        raise IncorrectResponseServerError(
             'Ответ от сервера некорректный, код: '
             f'{response.status_code}, данные авторизации {HEADERS}'
             f'адрес api {ENDPOINT}, метка даты в Unix {current_timestamp}'
@@ -114,8 +114,8 @@ def check_response(response):
             'В ответе API значение по ключу "homeworks" должно быть list'
             f'сейчас там {type(response("homeworks"))}'
         )
-    else:
-        return homeworks
+
+    return homeworks
 
 
 def parse_status(homework):
@@ -126,13 +126,12 @@ def parse_status(homework):
     if 'status' not in homework:
         raise KeyError('В ответе API не найден ключ status')
 
-    homework_name = homework.get("homework_name")
-
     if homework.get('status') not in HOMEWORK_VERDICTS:
         raise Exception(
             f'{homework.get("status")} - такой статус отсутствует в списке'
         )
 
+    homework_name = homework.get("homework_name")
     verdict = HOMEWORK_VERDICTS[homework.get('status')]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -143,7 +142,7 @@ def check_tokens():
     for token in TOKEN_NAMES:
         if not globals().get(token):
             availability_tokens = False
-            logging.error(f'Отсутствует токен: {token}')
+            logging.critical(f'Отсутствует токен: {token}')
     return availability_tokens
 
 
@@ -170,7 +169,7 @@ def main():
             logging.info(f'Ответ API корректный: \n{homeworks}')
 
             if not homeworks:
-                logging.error(
+                logging.warning(
                     'Ошибка получения данных последней домашки'
                     'словарь "homeworks" пуст'
                 )
