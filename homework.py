@@ -14,9 +14,9 @@ from exception import IncorrectResponseServerError
 
 load_dotenv()
 
-PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN_ENV')
-TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN_ENV')
-TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID_ENV')
+# PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN_ENV')
+# TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN_ENV')
+# TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID_ENV')
 
 TOKEN_NAMES = [
     'PRACTICUM_TOKEN',
@@ -169,7 +169,7 @@ def main():
             logging.info(f'Ответ API корректный: \n{homeworks}')
 
             if not homeworks:
-                logging.warning(
+                logging.info(
                     'Ошибка получения данных последней домашки'
                     'словарь "homeworks" пуст'
                 )
